@@ -128,6 +128,14 @@ pixelShader =
 -- Entities
 
 
+type alias EntitiesArgs =
+    { worldToCamera : Mat4
+    , mousePosition : Vec2
+    , time : Float
+    }
+
+
+entities : EntitiesArgs -> List Entity
 entities { worldToCamera, mousePosition, time } =
     let
         entityToCamera =
