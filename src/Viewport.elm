@@ -2,11 +2,12 @@ module Viewport exposing (..)
 
 import Browser.Dom
 import Browser.Events
-import Html exposing (Attribute, Html)
+import Html exposing (Attribute, Html, div)
 import Html.Attributes exposing (style)
 import Math.Matrix4 as Mat4 exposing (Mat4)
 import Math.Vector3 as Vec3 exposing (Vec3, vec3)
 import Task
+import WebGL
 
 
 -- Types
@@ -100,10 +101,18 @@ worldToPixelTransform pixelSize minimumContainedLength =
 -- DOM element
 
 
-attributes : PixelSize -> List (Attribute a)
-attributes pixelSize =
-    [ style "width" (String.fromInt pixelSize.width ++ "px")
-    , style "height" (String.fromInt pixelSize.height ++ "px")
-    , Html.Attributes.width pixelSize.width
-    , Html.Attributes.height pixelSize.height
-    ]
+toHtml : PixelSize -> List WebGL.Entity -> Html a
+toHtml pixelSize entities =
+    div
+        [ style "width" (String.fromInt pixelSize.width ++ "px")
+        , style "height" (String.fromInt pixelSize.height ++ "px")
+        , style "overflow" "hidden"
+        ]
+        [ WebGL.toHtml
+            [ style "width" (String.fromInt pixelSize.width ++ "px")
+            , style "height" (String.fromInt pixelSize.height ++ "px")
+            , Html.Attributes.width pixelSize.width
+            , Html.Attributes.height pixelSize.height
+            ]
+            entities
+        ]

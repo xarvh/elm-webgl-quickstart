@@ -100,13 +100,7 @@ view model =
     in
     { title = "WebGL Scaffold"
     , body =
-        [ div
-            -- TODO: move to Viewport?
-            [ style "width" (String.fromInt model.viewportSize.width ++ "px")
-            , style "height" (String.fromInt model.viewportSize.height ++ "px")
-            , style "overflow" "hidden"
-            ]
-            [ WebGL.toHtml (Viewport.attributes model.viewportSize) entities ]
+        [ Viewport.toHtml model.viewportSize entities
         , Html.node "style" [] [ Html.text "body { margin: 0; }" ]
         ]
     }
