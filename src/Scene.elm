@@ -4,6 +4,7 @@ import Math.Matrix4 as Mat4 exposing (Mat4)
 import Math.Vector2 as Vec2 exposing (Vec2, vec2)
 import Math.Vector3 as Vec3 exposing (Vec3, vec3)
 import Math.Vector4 as Vec4 exposing (Vec4, vec4)
+import Meshes
 import WebGL exposing (Entity, Mesh, Shader)
 
 
@@ -31,96 +32,64 @@ periodHarmonic time phase period =
 -- Shader records
 
 
-type alias VertexAttributes =
-    { x : Float
-    , y : Float
-    , vertexColor : Vec3
-    }
-
-
 type alias Uniforms =
     { entityToCamera : Mat4
-    , normalizedTime : Float
-    , mousePosition : Vec2
     }
 
 
 type alias Varyings =
-    { color : Vec3
-    , position : Vec4
+    { vfog : Float
+    , vnormal : Vec3
     }
 
 
-
--- Mesh
-
-
-mesh : WebGL.Mesh VertexAttributes
-mesh =
-    WebGL.triangles
-        [ ( { x = -1
-            , y = -1
-            , vertexColor = vec3 1 0 0
-            }
-          , { x = 1
-            , y = -1
-            , vertexColor = vec3 0 1 0
-            }
-          , { x = -1
-            , y = 1
-            , vertexColor = vec3 0 0 1
-            }
-          )
-        ]
+type alias VertexAttributes =
+    Meshes.PlainVertex
 
 
-vertexShader : WebGL.Shader VertexAttributes Uniforms Varyings
+vertexShader : Shader Meshes.PlainVertex Uniforms Varyings
 vertexShader =
     [glsl|
         precision mediump float;
 
-        attribute float x;
-        attribute float y;
-        attribute vec3 vertexColor;
+        attribute vec3 normal;
+        attribute vec3 position;
 
-        uniform float normalizedTime;
         uniform mat4 entityToCamera;
-        uniform vec2 mousePosition;
 
-        varying vec3 color;
-        varying vec4 position;
+        varying float vfog;
+        varying vec3 vnormal;
 
         void main () {
-            color = vertexColor;
-            position = vec4(x, y, 0, 1);
-            gl_Position = entityToCamera * position;
+            gl_Position = entityToCamera * vec4(position, 1.0);
+            vfog = length(gl_Position.xyz) / 10.0;
+            vnormal = normalize((entityToCamera * vec4(normal, 1.0)).xyz);
         }
     |]
 
 
-pixelShader : WebGL.Shader {} Uniforms Varyings
-pixelShader =
+fragmentShader : Shader {} Uniforms Varyings
+fragmentShader =
     [glsl|
         precision mediump float;
 
-        uniform float normalizedTime;
-        uniform mat4 entityToCamera;
-        uniform vec2 mousePosition;
+        varying float vfog;
+        varying vec3 vnormal;
 
-        varying vec3 color;
-        varying vec4 position;
+        vec4 heroColor = vec4(0.0, 0.0, 1.0, 1.0);
+        vec3 lightDirection = vec3(1.0, -1.0, -1.0);
 
-        void main () {
-          float d = distance(position.xy, mousePosition);
+        vec4 white = vec4(1.0);
+        vec4 black = vec4(0.0, 0.0, 0.0, 1.0);
+        vec4 fogColor = white;
 
-          float whiteness = (1.0 - sqrt(d)) * (0.75 + 0.25 * normalizedTime);
+        void main() {
+            float lightIntensity = 0.5 + 0.5 * dot(vnormal, -1.0 * lightDirection);
 
-          vec3 white = vec3(1.0, 1.0, 1.0);
-          vec3 blendedColor = mix(color, white, whiteness);
+            vec4 colorWithLight = mix(black, heroColor, lightIntensity);
 
-          gl_FragColor = vec4(blendedColor, 1.0);
+            gl_FragColor = mix(colorWithLight, fogColor, vfog);
         }
-
     |]
 
 
@@ -140,16 +109,15 @@ entities { worldToCamera, mousePosition, time } =
     let
         entityToCamera =
             worldToCamera
+              |> Mat4.rotate 0.2 (vec3 -0.5 -0.5 0.5)
 
         uniforms =
             { entityToCamera = entityToCamera
-            , mousePosition = mousePosition
-            , normalizedTime = periodHarmonic time 0 1.5
             }
     in
     [ WebGL.entity
         vertexShader
-        pixelShader
-        mesh
+        fragmentShader
+        Meshes.cube
         uniforms
     ]
