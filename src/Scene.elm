@@ -7,6 +7,7 @@ import Math.Vector4 as Vec4 exposing (Vec4, vec4)
 import WebGL exposing (Entity, Mesh, Shader)
 
 
+
 -- Periodic functions
 
 
@@ -28,99 +29,85 @@ periodHarmonic time phase period =
 
 
 
--- Shader records
+-- Square mesh
 
 
-type alias VertexAttributes =
-    { x : Float
-    , y : Float
-    , vertexColor : Vec3
-    }
-
-
-type alias Uniforms =
-    { entityToCamera : Mat4
-    , normalizedTime : Float
-    , mousePosition : Vec2
-    }
-
-
-type alias Varyings =
-    { color : Vec3
-    , position : Vec4
-    }
-
-
-
--- Mesh
-
-
-mesh : WebGL.Mesh VertexAttributes
+mesh : WebGL.Mesh CheckboardAttributes
 mesh =
-    WebGL.triangles
-        [ ( { x = -1
-            , y = -1
-            , vertexColor = vec3 1 0 0
-            }
-          , { x = 1
-            , y = -1
-            , vertexColor = vec3 0 1 0
-            }
-          , { x = -1
-            , y = 1
-            , vertexColor = vec3 0 0 1
-            }
-          )
+    WebGL.triangleFan
+        [ { x = -0.5
+          , y = -0.5
+          }
+        , { x = 0.5
+          , y = -0.5
+          }
+        , { x = 0.5
+          , y = 0.5
+          }
+        , { x = -0.5
+          , y = 0.5
+          }
         ]
 
 
-vertexShader : WebGL.Shader VertexAttributes Uniforms Varyings
-vertexShader =
+
+-- Checkboard
+
+
+type alias CheckboardAttributes =
+    { x : Float
+    , y : Float
+    }
+
+
+type alias CheckboardUniforms =
+    { entityToCamera : Mat4
+    , squares : Vec2
+    , black : Vec4
+    , white : Vec4
+    }
+
+
+type alias CheckboardVaryings =
+    { position : Vec4
+    }
+
+
+checkboardVertexShader : WebGL.Shader CheckboardAttributes CheckboardUniforms CheckboardVaryings
+checkboardVertexShader =
     [glsl|
         precision mediump float;
 
         attribute float x;
         attribute float y;
-        attribute vec3 vertexColor;
-
-        uniform float normalizedTime;
         uniform mat4 entityToCamera;
-        uniform vec2 mousePosition;
-
-        varying vec3 color;
+        uniform vec4 black;
+        uniform vec4 white;
         varying vec4 position;
 
         void main () {
-            color = vertexColor;
             position = vec4(x, y, 0, 1);
             gl_Position = entityToCamera * position;
         }
     |]
 
 
-pixelShader : WebGL.Shader {} Uniforms Varyings
-pixelShader =
+checkboardFragmentShader : WebGL.Shader {} CheckboardUniforms CheckboardVaryings
+checkboardFragmentShader =
     [glsl|
         precision mediump float;
 
-        uniform float normalizedTime;
         uniform mat4 entityToCamera;
-        uniform vec2 mousePosition;
-
-        varying vec3 color;
+        uniform vec2 squares;
+        uniform vec4 black;
+        uniform vec4 white;
         varying vec4 position;
 
         void main () {
-          float d = distance(position.xy, mousePosition);
-
-          float whiteness = (1.0 - sqrt(d)) * (0.75 + 0.25 * normalizedTime);
-
-          vec3 white = vec3(1.0, 1.0, 1.0);
-          vec3 blendedColor = mix(color, white, whiteness);
-
-          gl_FragColor = vec4(blendedColor, 1.0);
+          float x = floor(position.x * squares.x);
+          float y = floor(position.y * squares.y);
+          gl_FragColor = mod(x + y, 2.0) == 0.0 ? black : white;
         }
-
     |]
 
 
@@ -131,25 +118,30 @@ pixelShader =
 type alias EntitiesArgs =
     { worldToCamera : Mat4
     , mousePosition : Vec2
+    , worldSize : { width : Float, height : Float }
     , time : Float
     }
 
 
 entities : EntitiesArgs -> List Entity
-entities { worldToCamera, mousePosition, time } =
+entities { worldToCamera, mousePosition, time, worldSize } =
     let
-        entityToCamera =
-            worldToCamera
+        black =
+            0.7
 
-        uniforms =
-            { entityToCamera = entityToCamera
-            , mousePosition = mousePosition
-            , normalizedTime = periodHarmonic time 0 1.5
+        squaresPerWordUnit =
+            10
+
+        checkUniforms =
+            { entityToCamera = Mat4.scale3 worldSize.width worldSize.height 1.0 worldToCamera
+            , squares = vec2 (worldSize.width * squaresPerWordUnit) (worldSize.height * squaresPerWordUnit)
+            , black = vec4 black black black 1
+            , white = vec4 1 1 1 1
             }
     in
     [ WebGL.entity
-        vertexShader
-        pixelShader
+        checkboardVertexShader
+        checkboardFragmentShader
         mesh
-        uniforms
+        checkUniforms
     ]

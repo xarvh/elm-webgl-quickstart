@@ -11,7 +11,9 @@ import Math.Vector3 as Vec3 exposing (Vec3, vec3)
 import Scene
 import Time exposing (Posix)
 import Viewport exposing (PixelPosition, PixelSize)
+import Viewport.Combine
 import WebGL
+
 
 
 -- Types
@@ -88,19 +90,34 @@ update msg model =
 view : Model -> Browser.Document Msg
 view model =
     let
-        worldSize =
-            2.0
+        minWorldSize =
+            1
+
+        viewport =
+            { pixelSize = model.viewportSize
+            , minimumVisibleWorldSize = { width = minWorldSize, height = minWorldSize }
+            }
+
+        actualWorldSize =
+            Viewport.actualVisibleWorldSize viewport
 
         entities =
             Scene.entities
-                { worldToCamera = Viewport.worldToPixelTransform model.viewportSize worldSize
-                , mousePosition = Vec2.fromRecord <| Viewport.pixelToWorldUnits model.viewportSize worldSize model.mousePosition
+                { worldToCamera = Viewport.worldToCameraTransform viewport
+                , worldSize = actualWorldSize
+                , mousePosition = Vec2.fromRecord <| Viewport.pixelToWorld viewport model.mousePosition
                 , time = model.currentTimeInSeconds
                 }
     in
     { title = "WebGL Scaffold"
     , body =
-        [ Viewport.toHtml model.viewportSize entities
+        [ Viewport.Combine.wrapper
+            { viewportSize = model.viewportSize
+            , elementAttributes = []
+            , svgContent = []
+            , webglOptions = []
+            , webGlEntities = entities
+            }
         , Html.node "style" [] [ Html.text "body { margin: 0; }" ]
         ]
     }
@@ -113,8 +130,8 @@ view model =
 mousePositionDecoder : Decoder PixelPosition
 mousePositionDecoder =
     Json.Decode.map2 (\x y -> { left = x, top = y })
-        (Json.Decode.field "clientX" Json.Decode.int)
-        (Json.Decode.field "clientY" Json.Decode.int)
+        (Json.Decode.field "clientX" Json.Decode.float)
+        (Json.Decode.field "clientY" Json.Decode.float)
 
 
 subscriptions : Model -> Sub Msg
